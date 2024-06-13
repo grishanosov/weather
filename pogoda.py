@@ -1,5 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
+import datetime
 
 def send_telegram_message(chat_id, text, token):
     """Функция для отправки сообщений в Telegram."""
@@ -13,6 +14,10 @@ def send_telegram_message(chat_id, text, token):
     return response.json()
 
 def get_weather_data(url, headers, token):
+    # Получаем завтрашнюю дату
+    tomorrow_date = datetime.datetime.now() + datetime.timedelta(days=1)
+    formatted_date = tomorrow_date.strftime('%d.%m.%Y')  # Формат даты DD.MM.YYYY
+
     response = requests.get(url, headers=headers)
     soup = BeautifulSoup(response.text, 'html.parser')
 
@@ -35,7 +40,7 @@ def get_weather_data(url, headers, token):
     time_map = {'8:00': 'Утро', '14:00': 'День', '20:00': 'Вечер'}
     selected_humidities = []
     report_part1 = ""
-    report_part2 = ""
+    report_part2 = f"Прогноз погоды на {formatted_date}\n"
 
     for i, time in enumerate(data['times']):
         if time in time_map:
