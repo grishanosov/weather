@@ -1,10 +1,18 @@
 import requests
 from bs4 import BeautifulSoup
 
-import requests
-from bs4 import BeautifulSoup
+def send_telegram_message(chat_id, text, token):
+    """Функция для отправки сообщений в Telegram."""
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {
+        'chat_id': chat_id,
+        'text': text,
+        'parse_mode': 'HTML'
+    }
+    response = requests.post(url, data=payload)
+    return response.json()
 
-def get_weather_data(url, headers):
+def get_weather_data(url, headers, token):
     response = requests.get(url, headers=headers)
     soup = BeautifulSoup(response.text, 'html.parser')
 
@@ -26,43 +34,38 @@ def get_weather_data(url, headers):
     # Маппинг временных интервалов к нужным заголовкам и вывод данных
     time_map = {'8:00': 'Утро', '14:00': 'День', '20:00': 'Вечер'}
     selected_humidities = []
+    report_part1 = ""
+    report_part2 = ""
 
-    
     for i, time in enumerate(data['times']):
         if time in time_map:
-            print(f"{time_map[time]}: Погода: {data['weather_conditions'][i]}, Температура: {data['temperatures'][i+1]}°, Ощущается как: {data['feels_like_temperatures'][i+1]}°, Порывы: {data['gusts'][i+1]} м/с, Давление: {data['pressure'][i+1]} мм. рт. ст., Влажность: {data['humidity'][i]}%")
+            report = (f"{time_map[time]}: Погода: {data['weather_conditions'][i]}, Температура: {data['temperatures'][i+1]}°, "
+                      f"Ощущается как: {data['feels_like_temperatures'][i+1]}°, Порывы: {data['gusts'][i+1]} м/с, "
+                      f"Давление: {data['pressure'][i+1]} мм. рт. ст., Влажность: {data['humidity'][i]}%")
+            report_part1 += report + "\n"
             selected_humidities.append(data['humidity'][i])
 
     # Расчет средней влажности
     average_humidity = sum(selected_humidities) / len(selected_humidities) if selected_humidities else 0
 
-    # Переход на упрощенный отчет
-    print("\n" * 3)
     for i, time in enumerate(data['times']):
         if time in time_map:
             temp = data['temperatures'][i+1]
             condition = data['weather_conditions'][i]
-            print(f"{time_map[time]} {temp}° {condition.lower()}")
+            report_part2 += f"{time_map[time]} {temp}° {condition.lower()}\n"
 
-    print(f"Влажность {average_humidity:.0f}%")
-    print(f"Рассвет {sunrise}")
-    print(f"Закат {sunset}")
+    report_part2 += (f"Влажность {average_humidity:.0f}%\n"
+                     f"Рассвет {sunrise}\n"
+                     f"Закат {sunset}\n\n")
 
+    # Отправка отчетов в Telegram
+    send_telegram_message(-867700741, report_part1.strip(), token)
+    future_forecasts = fetch_weather_forecast(forecast_urls, headers, token)
+    send_telegram_message(-867700741, report_part2.strip() + future_forecasts, token)
 
-# Заголовки для имитации запроса от браузера
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-    'Accept-Language': 'ru-RU,ru;q=0.9',
-    'Accept-Encoding': 'gzip, deflate, br',
-    'Connection': 'keep-alive'
-}
-
-# URL страницы с прогнозом
-url = "https://www.gismeteo.ru/weather-toulouse-1880/tomorrow/"
-get_weather_data(url, headers)
-
-def fetch_weather_forecast(urls, headers):
+def fetch_weather_forecast(urls, headers, token):
     weekdays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
+    future_forecasts = ""
 
     for url in urls:
         response = requests.get(url, headers=headers)
@@ -87,15 +90,28 @@ def fetch_weather_forecast(urls, headers):
                 break
         
         weather_description = soup.select_one('.weathertab.weathertab-block.tooltip')['data-text']
+        future_forecasts += f"\n{next_day} {temperature_at_14}° {weather_description}"
 
-        print(f"{next_day} {temperature_at_14}° {weather_description}")
+    return future_forecasts
 
-# URL страниц с прогнозами на несколько дней
+# Заголовки для имитации запроса от браузера
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    'Accept-Language': 'ru-RU,ru;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Connection': 'keep-alive'
+}
+
+# Токен вашего бота в Telegram
+token = '7464681990:AAHAi3htak1tJwqqN4M39pPYHq9M0rXdcPI'
+
+# URL страницы с прогнозом и страницы с прогнозами на несколько дней
+url = "https://www.gismeteo.ru/weather-toulouse-1880/tomorrow/"
 forecast_urls = [
     "https://www.gismeteo.ru/weather-toulouse-1880/3-day/",
     "https://www.gismeteo.ru/weather-toulouse-1880/4-day/",
     "https://www.gismeteo.ru/weather-toulouse-1880/5-day/"
 ]
 
-fetch_weather_forecast(forecast_urls, headers)
-
+# Вызов функции для получения и отправки данных
+get_weather_data(url, headers, token)
