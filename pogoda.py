@@ -1,6 +1,6 @@
-from datetime import datetime, timedelta
 import requests
 from bs4 import BeautifulSoup
+from datetime import datetime, timedelta
 
 # Определение общих заголовков
 HEADERS = {
@@ -21,11 +21,14 @@ def fetch_detailed_weather_data(url):
     if isinstance(soup, str):
         return soup
     
+    # Извлечение данных о погоде
     data = {
         "times": [time.text for time in soup.select('.widget-row-datetime-time .row-item span')],
         "weather_conditions": [row['data-tooltip'] for row in soup.select('.widget-row-icon .row-item') if 'data-tooltip' in row.attrs],
         "temperatures": [temp['value'] for temp in soup.select('.widget-row-chart-temperature-air .value temperature-value')],
-        "humidities": [int(humidity.text.strip('%')) for humidity in soup.select('.widget-row-humidity .row-item')]
+        "humidities": [int(humidity.text.strip('%')) for humidity in soup.select('.widget-row-humidity .row-item')],
+        "sunrise": soup.select_one('.astro-times div:nth-of-type(2)').text.split('—')[1].strip(),
+        "sunset": soup.select_one('.astro-times div:nth-of-type(3)').text.split('—')[1].strip()
     }
     return data
 
@@ -38,6 +41,7 @@ def format_output(detailed_data):
     tomorrow = datetime.now() + timedelta(days=1)
     output.append(f"Прогноз погоды на {tomorrow.strftime('%d.%m.%Y')}")
 
+    # Форматирование вывода по времени дня
     time_labels = {'8:00': 'Утро', '14:00': 'День', '20:00': 'Вечер'}
     for key_time, label in time_labels.items():
         if key_time in detailed_data['times']:
@@ -46,6 +50,8 @@ def format_output(detailed_data):
     
     avg_humidity = sum(detailed_data['humidities']) / len(detailed_data['humidities'])
     output.append(f"Влажность {avg_humidity:.0f}%")
+    output.append(f"Рассвет: {detailed_data['sunrise']}")
+    output.append(f"Закат: {detailed_data['sunset']}")
     return "\n".join(output)
 
 def send_telegram_message(chat_id, text, token):
